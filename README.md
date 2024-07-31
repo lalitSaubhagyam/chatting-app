@@ -43,3 +43,45 @@ This chat application enables users to register, log in, and engage in real-time
 
 - All messages are saved in the database with timestamps.
 - Chat history is retrieved from the database and displayed when a chat window is opened.
+
+## How to Start the Project
+
+### Prerequisites
+
+Make sure you have the following installed on your machine:
+- [Node.js](https://nodejs.org/)
+
+### Installation
+
+1. Clone the repository:
+
+```bash
+ git clone <repository-url>
+```
+
+2. Navigate to the project directory:
+
+```bash
+ cd chatting-app
+```
+
+3. Install the dependencies:
+
+```bash
+ npm install
+```
+
+4. Create a `.env` file in the root of the project and add the following environment variables:
+
+```env
+ PORT=3000
+ MONGODB_URI=<your-mongodb-uri>
+```
+
+### Starting the Application
+
+1. Start the Node.js server:
+
+```bash
+ npm start
+```
