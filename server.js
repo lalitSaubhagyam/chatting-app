@@ -6,7 +6,8 @@ const socketIo = require('socket.io');
 const path = require('path');
 const session = require('express-session');
 const User = require('./models/user');
-const Message = require('./models/message'); // Add the Message model
+const Message = require('./models/message');
+const Group = require('./models/group'); // Add Group model
 
 const app = express();
 const server = http.createServer(app);
@@ -42,9 +43,11 @@ app.get('/register', (req, res) => {
 app.get('/', checkAuth, async (req, res) => {
     try {
         const users = await User.find({ _id: { $ne: req.session.user._id } });
+        const groups = await Group.find({ members: req.session.user._id }).populate('members', 'username');
         res.render('chat', {
             username: req.session.user.username,
             users,
+            groups,
             userId: req.session.user._id
         });
     } catch (err) {
@@ -91,30 +94,81 @@ app.post('/login', async (req, res) => {
     }
 });
 
+// Group chat routes
+app.post('/create-group', async (req, res) => {
+    try {
+        const { name, members } = req.body;
+
+        if (!name && members.length < 2) {
+            return res.status(400).json({ message: 'Group name and members are required' });
+        }
+
+       const group = new Group({ name, members });
+        await group.save();
+
+        res.status(201).json({ message: 'Group created successfully' });
+    } catch (err) {
+        res.status(500).json({ message: 'Error creating group', error: err.message });
+    }
+});
+
+app.get('/group-messages/:groupId', async (req, res) => {
+    try {
+        const { groupId } = req.params;
+        const messages = await Message.find({ group: groupId })
+            .populate('sender', 'username')
+            .populate('group')
+            .exec();
+
+        res.json(messages);
+    } catch (err) {
+        res.status(500).send('Error fetching group messages');
+    }
+});
+
 io.on('connection', (socket) => {
-  console.log('A user connected');
+    console.log('A user connected');
   
-  socket.on('join', (userId) => {
-      socket.join(userId);
-      console.log(`User ${userId} joined`);
-  });
+    socket.on('join', (userId) => {
+        socket.join(userId);
+        console.log(`User ${userId} joined`);
+    });
 
-  socket.on('chat message', async (data) => {
-      const { content, receiverId, senderId } = data;
-      const message = new Message({ content, sender: senderId, receiver: receiverId });
-      await message.save();
+    socket.on('join group', (groupId) => {
+        socket.join(groupId);
+        console.log(`Group ${groupId} joined`);
+    });
 
-      // Get sender's username
-      const sender = await User.findById(senderId);
+    socket.on('chat message', async (data) => {
+        const { content, receiverId, senderId, groupId } = data;
 
-      // Emit to the receiver and sender
-      io.to(receiverId).emit('chat message', { content, senderName: sender.username, timestamp: message.timestamp });
-      io.to(senderId).emit('chat message', { content, senderName: sender.username, timestamp: message.timestamp });
-  });
+        // Determine whether it's a group message or direct message
+        const messageData = {
+            content,
+            sender: senderId,
+            receiver: receiverId || null,
+            group: groupId || null,
+        };
 
-  socket.on('disconnect', () => {
-      console.log('User disconnected');
-  });
+        const message = new Message(messageData);
+        await message.save();
+
+        // Get sender's username
+        const sender = await User.findById(senderId);
+
+        if (groupId) {
+            // Emit to all members of the group
+            io.to(groupId).emit('chat message', { content, senderName: sender.username, timestamp: message.timestamp });
+        } else if (receiverId) {
+            // Emit to the receiver and sender
+            io.to(receiverId).emit('chat message', { content, senderName: sender.username, timestamp: message.timestamp });
+            io.to(senderId).emit('chat message', { content, senderName: sender.username, timestamp: message.timestamp });
+        }
+    });
+
+    socket.on('disconnect', () => {
+        console.log('User disconnected');
+    });
 });
 
 app.get('/messages/:userId', async (req, res) => {
