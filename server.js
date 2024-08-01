@@ -103,7 +103,7 @@ app.post('/create-group', async (req, res) => {
             return res.status(400).json({ message: 'Group name and members are required' });
         }
 
-       const group = new Group({ name, members });
+        const group = new Group({ name, members });
         await group.save();
 
         res.status(201).json({ message: 'Group created successfully' });
@@ -128,7 +128,7 @@ app.get('/group-messages/:groupId', async (req, res) => {
 
 io.on('connection', (socket) => {
     console.log('A user connected');
-  
+
     socket.on('join', (userId) => {
         socket.join(userId);
         console.log(`User ${userId} joined`);
@@ -158,11 +158,11 @@ io.on('connection', (socket) => {
 
         if (groupId) {
             // Emit to all members of the group
-            io.to(groupId).emit('chat message', { content, senderName: sender.username, timestamp: message.timestamp });
+            io.to(groupId).emit('chat message', { senderId, content, senderName: sender.username, timestamp: message.timestamp });
         } else if (receiverId) {
             // Emit to the receiver and sender
             io.to(receiverId).emit('chat message', { content, senderName: sender.username, timestamp: message.timestamp });
-            io.to(senderId).emit('chat message', { content, senderName: sender.username, timestamp: message.timestamp });
+            io.to(senderId).emit('chat message', { senderId, content, senderName: sender.username, timestamp: message.timestamp });
         }
     });
 
